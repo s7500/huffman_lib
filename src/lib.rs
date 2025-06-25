@@ -6,7 +6,6 @@ mod tree;
 use compressor::Compressor;
 use file_format::FileFormat;
 use std::collections::HashMap;
-// use std::error::Error;
 use std::fs::{self, File};
 use std::io::{BufReader, Read};
 use std::path::PathBuf;

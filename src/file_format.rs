@@ -1,6 +1,5 @@
 use crate::compressor::CodeMap;
 use crate::errors::CustomError;
-use std::error::Error;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::PathBuf;
