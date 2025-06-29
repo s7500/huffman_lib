@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::result::Result;
 use tree::Tree;
 
-fn compress(input: PathBuf, output: PathBuf) -> Result<(), errors::CustomError> {
+pub fn compress(input: PathBuf, output: PathBuf) -> Result<(), errors::CustomError> {
     let file = File::open(input)?;
     let mut buf_reader = BufReader::new(file);
     let mut content = String::new();
@@ -31,7 +31,7 @@ fn compress(input: PathBuf, output: PathBuf) -> Result<(), errors::CustomError> 
     FileFormat::write_coded_file(output, code_map, compressed_data)
 }
 
-fn decompress(input: PathBuf, output: PathBuf) -> Result<(), errors::CustomError> {
+pub fn decompress(input: PathBuf, output: PathBuf) -> Result<(), errors::CustomError> {
     let file = File::open(input)?;
     let mut buf_reader = BufReader::new(file);
     let code_map = FileFormat::read_coded_file(&mut buf_reader)?;

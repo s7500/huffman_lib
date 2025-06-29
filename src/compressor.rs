@@ -89,3 +89,112 @@ impl Compressor {
         tokens
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tree::Tree;
+
+    fn create_test_tree() -> Tree {
+        let mut freq_map = HashMap::new();
+        freq_map.insert('a', 3);
+        freq_map.insert('b', 2);
+        Tree::build_tree(freq_map)
+    }
+
+    #[test]
+    fn test_to_encode_single_leaf() {
+        let tree = Tree::Leaf {
+            element: 'a',
+            weight: 5,
+        };
+        let code_map = Compressor::to_encode(tree);
+
+        assert_eq!(code_map.len(), 1);
+        assert!(code_map.contains_key(&'a'));
+        assert_eq!(code_map[&'a'], vec![]);
+    }
+
+    #[test]
+    fn test_to_encode_two_leaves() {
+        let tree = create_test_tree();
+        let code_map = Compressor::to_encode(tree);
+
+        assert_eq!(code_map.len(), 2);
+        assert!(code_map.contains_key(&'a'));
+        assert!(code_map.contains_key(&'b'));
+
+        // One should be [0] and the other [1]
+        let mut codes: Vec<Vec<u8>> = code_map.values().cloned().collect();
+        codes.sort();
+        assert_eq!(codes, vec![vec![0], vec![1]]);
+    }
+
+    #[test]
+    fn test_flip_code_map() {
+        let mut code_map = HashMap::new();
+        code_map.insert('a', vec![0, 1]);
+        code_map.insert('b', vec![1, 0]);
+
+        let flipped = Compressor::flip_code_map(&code_map);
+
+        assert_eq!(flipped.len(), 2);
+        assert_eq!(flipped[&vec![0, 1]], 'a');
+        assert_eq!(flipped[&vec![1, 0]], 'b');
+    }
+
+    #[test]
+    fn test_compress_simple() {
+        let mut code_map = HashMap::new();
+        code_map.insert('a', vec![0]);
+        code_map.insert('b', vec![1]);
+
+        let content = "ab".to_string();
+        let compressed = Compressor::to_compress(&content, &code_map);
+
+        // 'a' = 0, 'b' = 1, so "ab" = 01 = 01000000 in binary (left-aligned)
+        assert_eq!(compressed, vec![0b01000000]);
+    }
+
+    #[test]
+    fn test_compress_multiple_bytes() {
+        let mut code_map = HashMap::new();
+        code_map.insert('a', vec![0, 0]);
+        code_map.insert('b', vec![1, 1]);
+
+        let content = "aaaa".to_string();
+        let compressed = Compressor::to_compress(&content, &code_map);
+
+        // 'a' = 00, so "aaaa" = 00000000 = 0
+        assert_eq!(compressed, vec![0b00000000]);
+    }
+
+    #[test]
+    fn test_compress_decompress_roundtrip() {
+        let mut code_map = HashMap::new();
+        code_map.insert('a', vec![0]);
+        code_map.insert('b', vec![1]);
+
+        let original = "abab".to_string();
+        let compressed = Compressor::to_compress(&original, &code_map);
+        let decompressed = Compressor::to_decompress(&compressed, &code_map);
+
+        assert_eq!(decompressed.join(""), original);
+    }
+
+    #[test]
+    fn test_decompress_simple() {
+        let mut code_map = HashMap::new();
+        code_map.insert('a', vec![0]);
+        code_map.insert('b', vec![1]);
+
+        // 01000000 = 'a' then 'b' (with padding)
+        let compressed = vec![0b01000000];
+        let decompressed = Compressor::to_decompress(&compressed, &code_map);
+
+        // Should contain "a" and "b" but might have extra characters due to padding
+        assert!(decompressed.len() >= 2);
+        assert_eq!(decompressed[0], "a");
+        assert_eq!(decompressed[1], "b");
+    }
+}
