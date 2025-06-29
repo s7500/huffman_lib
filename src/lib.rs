@@ -26,9 +26,9 @@ pub fn compress(input: PathBuf, output: PathBuf) -> Result<(), errors::CustomErr
 
     let tree = Tree::build_tree(freq_map);
     let code_map = Compressor::to_encode(tree);
-    let compressed_data = Compressor::to_compress(&content, &code_map);
+    let (compressed_data, char_count) = Compressor::to_compress(&content, &code_map);
 
-    FileFormat::write_coded_file(output, code_map, compressed_data)
+    FileFormat::write_coded_file(output, code_map, compressed_data, char_count)
 }
 
 pub fn decompress(input: PathBuf, output: PathBuf) -> Result<(), errors::CustomError> {
@@ -37,9 +37,11 @@ pub fn decompress(input: PathBuf, output: PathBuf) -> Result<(), errors::CustomE
     let code_map = FileFormat::read_coded_file(&mut buf_reader)?;
 
     // decompress data
+    let mut char_count = [0u8; 4];
+    buf_reader.read(&mut char_count)?;
     let mut content = Vec::new();
     buf_reader.read_to_end(&mut content)?;
-    let data = Compressor::to_decompress(&content, &code_map);
+    let data = Compressor::to_decompress(&content, &code_map, char_count);
 
     //write data to file
     fs::write(output, data.concat())?;

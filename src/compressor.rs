@@ -37,12 +37,15 @@ impl Compressor {
         flipped_map
     }
 
-    pub fn to_compress(content: &String, code_map: &CodeMap) -> Vec<u8> {
+    pub fn to_compress(content: &String, code_map: &CodeMap) -> (Vec<u8>, u32) {
         let mut bytes = Vec::new();
         let mut current_byte = 0u8;
         let mut bit_count = 0;
+        let mut char_count = 0;
 
         for ch in content.chars() {
+            char_count += 1;
+
             for &bit in &code_map[&ch] {
                 if bit == 1 {
                     current_byte |= 1 << (7 - bit_count);
@@ -61,18 +64,27 @@ impl Compressor {
             bytes.push(current_byte);
         }
 
-        bytes
+        (bytes, char_count)
     }
 
-    pub fn to_decompress(content: &Vec<u8>, code_map: &CodeMap) -> Vec<String> {
+    pub fn to_decompress(
+        content: &Vec<u8>,
+        code_map: &CodeMap,
+        char_count_b: [u8; 4],
+    ) -> Vec<String> {
         let mut candidate = Vec::new();
         let mut tokens = Vec::new();
+        let char_count = u32::from_le_bytes(char_count_b) as usize;
 
         let flipped_map = Compressor::flip_code_map(code_map);
 
         for &byte in content.into_iter() {
             let curr_byte = byte;
+
             for i in 0..8 {
+                if tokens.len() >= char_count {
+                    break;
+                }
                 let bit = (curr_byte >> (7 - i)) & 1;
                 candidate.push(bit);
 
@@ -81,7 +93,7 @@ impl Compressor {
                         tokens.push(ch.to_string());
                         candidate.clear();
                     }
-                    None => {}
+                    None => (),
                 }
             }
         }
@@ -150,10 +162,11 @@ mod tests {
         code_map.insert('b', vec![1]);
 
         let content = "ab".to_string();
-        let compressed = Compressor::to_compress(&content, &code_map);
+        let (compressed, char_count) = Compressor::to_compress(&content, &code_map);
 
         // 'a' = 0, 'b' = 1, so "ab" = 01 = 01000000 in binary (left-aligned)
         assert_eq!(compressed, vec![0b01000000]);
+        assert_eq!(char_count, 2u32);
     }
 
     #[test]
@@ -163,10 +176,11 @@ mod tests {
         code_map.insert('b', vec![1, 1]);
 
         let content = "aaaa".to_string();
-        let compressed = Compressor::to_compress(&content, &code_map);
+        let (compressed, char_count) = Compressor::to_compress(&content, &code_map);
 
         // 'a' = 00, so "aaaa" = 00000000 = 0
         assert_eq!(compressed, vec![0b00000000]);
+        assert_eq!(char_count, 4u32);
     }
 
     #[test]
@@ -176,8 +190,9 @@ mod tests {
         code_map.insert('b', vec![1]);
 
         let original = "abab".to_string();
-        let compressed = Compressor::to_compress(&original, &code_map);
-        let decompressed = Compressor::to_decompress(&compressed, &code_map);
+        let (compressed, char_count) = Compressor::to_compress(&original, &code_map);
+        let decompressed =
+            Compressor::to_decompress(&compressed, &code_map, char_count.to_le_bytes());
 
         assert_eq!(decompressed.join(""), original);
     }
@@ -190,7 +205,7 @@ mod tests {
 
         // 01000000 = 'a' then 'b' (with padding)
         let compressed = vec![0b01000000];
-        let decompressed = Compressor::to_decompress(&compressed, &code_map);
+        let decompressed = Compressor::to_decompress(&compressed, &code_map, 2u32.to_le_bytes());
 
         // Should contain "a" and "b" but might have extra characters due to padding
         assert!(decompressed.len() >= 2);

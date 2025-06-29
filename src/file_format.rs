@@ -11,6 +11,7 @@ impl FileFormat {
         path: PathBuf,
         header: CodeMap,
         data: Vec<u8>,
+        char_count: u32,
     ) -> Result<(), CustomError> {
         let coded_file = File::create(path)?;
 
@@ -24,6 +25,9 @@ impl FileFormat {
             writer.write_all(&(code.len() as u8).to_le_bytes())?;
             writer.write_all(code)?;
         }
+        //write data lenght
+        writer.write_all(&char_count.to_le_bytes())?;
+
         // write data to file
         writer.write_all(&data)?;
 
